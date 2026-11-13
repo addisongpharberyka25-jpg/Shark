@@ -23,22 +23,24 @@ jobs:
         with:
           targets: aarch64-linux-android
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept SDK licenses
-        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
-
-      - name: Install SDK + NDK
+      - name: Install NDK (using preinstalled SDK)
         run: |
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
-          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/28.2.13676358" >> "$GITHUB_ENV"
+          export ANDROID_HOME=/usr/local/lib/android/sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          ls "$ANDROID_HOME" || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;28.2.13676358" || true
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+          ls "$ANDROID_HOME/ndk" || true
 
       - name: Fix cargo linker
         run: |
-          NDK="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
+          NDK="$ANDROID_HOME/ndk/28.2.13676358"
           CFG=exploit/rust-kplant/.cargo/config.toml
           sed -i "s#^linker = .*#linker = \"$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang\"#" "$CFG"
+          cat "$CFG"
 
       - name: Build kplant (k61258)
         run: |
