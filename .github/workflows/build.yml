@@ -1,0 +1,59 @@
+name: Build Shark APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK + NDK
+        run: |
+          sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;28.2.13676358"
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/28.2.13676358" >> "$GITHUB_ENV"
+
+      - name: Fix cargo linker
+        run: |
+          NDK="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
+          CFG=exploit/rust-kplant/.cargo/config.toml
+          sed -i "s#^linker = .*#linker = \"$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang\"#" "$CFG"
+          grep linker "$CFG"
+
+      - name: Build kplant (k61258)
+        run: |
+          cd exploit/rust-kplant
+          CARGO_TARGET_DIR=target/k61258 cargo build --release --target aarch64-linux-android --no-default-features --features k61258
+          cp target/k61258/aarch64-linux-android/release/kplant ../../app/app/src/main/jniLibs/arm64-v8a/libk61258.so
+          chmod 755 ../../app/app/src/main/jniLibs/arm64-v8a/libk61258.so
+
+      - name: Build APK
+        run: |
+          cd app
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: shark-apk
+          path: app/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
