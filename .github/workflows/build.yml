@@ -26,9 +26,12 @@ jobs:
       - name: Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
       - name: Install SDK + NDK
         run: |
-          sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;28.2.13676358"
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
           echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
       - name: Fix cargo linker
@@ -36,7 +39,6 @@ jobs:
           NDK="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
           CFG=exploit/rust-kplant/.cargo/config.toml
           sed -i "s#^linker = .*#linker = \"$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android31-clang\"#" "$CFG"
-          grep linker "$CFG"
 
       - name: Build kplant (k61258)
         run: |
